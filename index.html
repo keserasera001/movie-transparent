@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok & LINEスタンプ対応 ちらつき防止・背景透過ツール</title>
+<!-- GIF生成用ライブラリ (gif.js) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #f4f5f7;
+    color: #333;
+    margin: 0;
+    padding: 12px;
+  }
+  h2 {
+    text-align: center;
+    font-size: 18px;
+    margin: 10px 0 16px;
+    line-height: 1.4;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .card h3 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 6px;
+  }
+  .control-group {
+    margin-bottom: 12px;
+  }
+  .control-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  input[type="range"] {
+    width: 100%;
+    margin: 6px 0;
+  }
+  select, input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  .tip-box {
+    background: #f8f9fa;
+    border-left: 4px solid #ffd43b;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #555;
+    line-height: 1.5;
+    border-radius: 4px;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
+  .btn-primary { background: #0d6efd; color: #fff; }
+  .btn-danger { background: #dc3545; color: #fff; }
+  .btn-outline { background: #fff; color: #333; border: 1px solid #ccc; }
+  .btn-outline.active { background: #e7f1ff; border-color: #0d6efd; color: #0d6efd; }
+  .btn-tiktok-gif { background: #161823; color: #00f2fe; border: 2px solid #fe2c55; }
+  .btn-green { background: #20a53a; color: #fff; }
+  .btn-line { background: #06c755; color: #fff; }
+  .section-label {
+    font-size: 12px;
+    font-weight: bold;
+    margin: 12px 0 6px;
+  }
+  .preview-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: 
+      linear-gradient(45deg, #ccc 25%, transparent 25%), 
+      linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, #ccc 75%), 
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: #eee;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 260px;
+    margin-bottom: 10px;
+  }
+  canvas {
+    max-width: 100%;
+    max-height: 340px;
+    object-fit: contain;
+    display: block;
+  }
+  #statusMsg {
+    text-align: center;
+    font-size: 13px;
+    font-weight: bold;
+    color: #0d6efd;
+    margin: 6px 0;
+    min-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<h2>TikTok & LINEスタンプ対応<br>ちらつき防止・背景透過ツール</h2>
+
+<div class="card">
+  <h3>1. 動画選択</h3>
+  <input type="file" id="videoInput" accept="video/*">
+</div>
+
+<div class="card">
+  <h3>2. 透過＆ちらつき防止設定</h3>
+  <div class="control-group">
+    <label>フチで止める強さ（感度）: <span id="tolVal">22</span></label>
+    <input type="range" id="tolerance" min="5" max="80" value="22">
+  </div>
+  <div class="control-group">
+    <label>時間軸ブレ防止（ちらつきロック）: <span id="stabVal">70</span>%</label>
+    <input type="range" id="stability" min="0" max="95" value="70">
+  </div>
+  <div class="control-group">
+    <label>フチ残りを削る（白いモヤ・影消去）: <span id="erodeVal">1</span>px</label>
+    <input type="range" id="erode" min="0" max="4" value="1">
+  </div>
+  <div class="tip-box">
+    💡 白いフチのキャラの場合は、感度を15〜30（低め）にすると白いフチでピタッと止まります。「時間軸ブレ防止」が前後のコマの輪郭を固定してチカチカするちらつきを止めます！
+  </div>
+</div>
+
+<div class="card">
+  <h3>3. 実行操作</h3>
+  <button class="btn btn-primary" id="applyBtn">✨ 透過実行 (背景色を再ロック)</button>
+  <button class="btn btn-danger" id="resetBtn">🔄 リセット (元に戻す)</button>
+</div>
+
+<div class="card">
+  <h3>4. さらに縁取りを追加（ステッカー風）</h3>
+  <div class="control-group">
+    <label>太さ: <span id="outlineVal">6</span>px</label>
+    <input type="range" id="outlineWidth" min="1" max="15" value="6">
+  </div>
+  <div class="control-group" style="margin-bottom:10px;">
+    <span style="font-size:13px; font-weight:bold;">追加フチの色: </span>
+    <label style="display:inline; font-weight:normal; margin-right:12px;">
+      <input type="radio" name="outlineColor" value="white" checked> 白
+    </label>
+    <label style="display:inline; font-weight:normal;">
+      <input type="radio" name="outlineColor" value="black"> 黒
+    </label>
+  </div>
+  <button class="btn btn-outline" id="outlineToggleBtn">⚪ 縁取り追加 (ON/OFF)</button>
+</div>
+
+<div class="card">
+  <h3>5. プレビュー</h3>
+  <div id="statusMsg">動画を選択してください</div>
+  <div class="preview-wrapper">
+    <canvas id="previewCanvas" width="300" height="300"></canvas>
+  </div>
+  <button class="btn btn-outline" id="playPauseBtn">⏯️ 再生 / 一時停止</button>
+</div>
+
+<div class="card">
+  <h3>6. 保存サイズ・形式を選ぶ</h3>
+  <div class="control-group">
+    <label>出力サイズ設定 (TikTok / LINE) :</label>
+    <select id="sizeSelect">
+      <optgroup label="🎵 TikTok用サイズ">
+        <option value="300x300" selected>TikTok LIVEエモート・スタンプ (正方形 300×300)</option>
+        <option value="500x500">TikTok コメント用ステッカー (正方形 500×500)</option>
+        <option value="270x480">TikTok ショート動画合成用 (9:16 縦型 270×480)</option>
+      </optgroup>
+      <optgroup label="💬 LINEスタンプ用サイズ">
+        <option value="320x270">LINE 動くスタンプ規定 (最大320×270)</option>
+        <option value="370x320">LINE 静止画スタンプ規定 (最大370×320)</option>
+        <option value="240x240">LINE メイン画像規定 (240×240)</option>
+      </optgroup>
+      <optgroup label="🎥 その他">
+        <option value="original">元動画の比率のまま (最大360px)</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label>録画する長さ (秒数) :</label>
+    <select id="durationSelect">
+      <option value="2">2秒 (軽量・ループ向き)</option>
+      <option value="3" selected>3秒 (TikTokスタンプ推奨・上限)</option>
+      <option value="4">4秒 (LINE動くスタンプ上限)</option>
+      <option value="all">元動画の最後まで (最大8秒)</option>
+    </select>
+  </div>
+
+  <div class="section-label" style="color:#d63384;">🎵 TikTok スタンプ・動画合成用</div>
+  <button class="btn btn-tiktok-gif" id="saveTiktokGifBtn">🎵 TikTok動くスタンプ (透過GIF) で保存</button>
+  <button class="btn btn-green" id="saveGreenMp4Btn">🟩 TikTok/CapCut合成用 (グリーンバックMP4)</button>
+
+  <div class="section-label" style="color:#198754;">💬 LINEスタンプ・汎用保存</div>
+  <button class="btn btn-line" id="saveLineGifBtn">💬 LINEサイズ / 汎用 透過GIFで保存</button>
+  <button class="btn btn-outline" id="savePngBtn">🖼️ 現在のコマを透過PNG (静止画) で保存</button>
+</div>
+
+<!-- スマホのデコードブロック対策（完全に画面外へ飛ばさず透明化して配置） -->
+<video id="hiddenVideo" playsinline webkit-playsinline muted loop style="opacity: 0.01; position: absolute; width: 1px; height: 1px; pointer-events: none;"></video>
+
+<script>
+const video = document.getElementById('hiddenVideo');
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+const workCanvas = document.createElement('canvas');
+const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+const videoInput = document.getElementById('videoInput');
+const toleranceInput = document.getElementById('tolerance');
+const stabilityInput = document.getElementById('stability');
+const erodeInput = document.getElementById('erode');
+const outlineWidthInput = document.getElementById('outlineWidth');
+const sizeSelect = document.getElementById('sizeSelect');
+const durationSelect = document.getElementById('durationSelect');
+const statusMsg = document.getElementById('statusMsg');
+
+let isTransparentMode = true;
+let isOutlineOn = false;
+let bgColor = null;
+let prevMask = null;
+let animId = null;
+let isVideoLoaded = false;
+
+toleranceInput.addEventListener('input', () => document.getElementById('tolVal').textContent = toleranceInput.value);
+stabilityInput.addEventListener('input', () => document.getElementById('stabVal').textContent = stabilityInput.value);
+erodeInput.addEventListener('input', () => document.getElementById('erodeVal').textContent = erodeInput.value);
+outlineWidthInput.addEventListener('input', () => document.getElementById('outlineVal').textContent = outlineWidthInput.value);
+
+videoInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  statusMsg.textContent = "動画を読み込んでいます...";
+  isVideoLoaded = false;
+  if (animId) cancelAnimationFrame(animId);
+
+  const url = URL.createObjectURL(file);
+  video.src = url;
+  video.load();
+
+  video.onloadeddata = () => {
+    isVideoLoaded = true;
+    setupCanvasSizes();
+    bgColor = null;
+    prevMask = null;
+
+    video.currentTime = 0;
+    video.play().then(() => {
+      statusMsg.textContent = "✅ 再生中（背景透過ON）";
+      startRenderLoop();
+    }).catch(() => {
+      statusMsg.textContent = "✅ 読み込み完了（下の「再生」を押してください）";
+      renderSingleFrame();
+    });
+  };
+
+  video.onerror = () => {
+    statusMsg.textContent = "⚠️ 動画の読み込みに失敗しました。";
+  };
+});
+
+function setupCanvasSizes() {
+  if (!isVideoLoaded) return;
+  const vw = video.videoWidth || 300;
+  const vh = video.videoHeight || 300;
+
+  const maxWork = 360;
+  const scale = Math.min(1, maxWork / Math.max(vw, vh));
+  workCanvas.width = Math.max(1, Math.round(vw * scale));
+  workCanvas.height = Math.max(1, Math.round(vh * scale));
+  prevMask = null;
+
+  const val = sizeSelect.value;
+  if (val === 'original') {
+    canvas.width = workCanvas.width;
+    canvas.height = workCanvas.height;
+  } else {
+    const [w, h] = val.split('x').map(Number);
+    canvas.width = w;
+    canvas.height = h;
+  }
+}
+
+sizeSelect.addEventListener('change', () => {
+  setupCanvasSizes();
+  if (isVideoLoaded && video.paused) renderSingleFrame();
+});
+
+document.getElementById('applyBtn').addEventListener('click', () => {
+  if (!isVideoLoaded) return;
+  isTransparentMode = true;
+  bgColor = null;
+  prevMask = null;
+  statusMsg.textContent = "✨ 背景色を再ロックして透過しました";
+  if (video.paused) renderSingleFrame();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!isVideoLoaded) return;
+  isTransparentMode = false;
+  prevMask = null;
+  statusMsg.textContent = "🔄 元の動画に戻しました";
+  if (video.paused) renderSingleFrame();
+});
+
+const outlineToggleBtn = document.getElementById('outlineToggleBtn');
+outlineToggleBtn.addEventListener('click', () => {
+  isOutlineOn = !isOutlineOn;
+  outlineToggleBtn.classList.toggle('active', isOutlineOn);
+  outlineToggleBtn.textContent = isOutlineOn ? "🔵 縁取り追加: ON" : "⚪ 縁取り追加 (ON/OFF)";
+  if (isVideoLoaded && video.paused) renderSingleFrame();
+});
+
+document.getElementById('playPauseBtn').addEventListener('click', () => {
+  if (!isVideoLoaded) return;
+  if (video.paused) {
+    video.play();
+    statusMsg.textContent = "▶️ 再生中";
+    startRenderLoop();
+  } else {
+    video.pause();
+    statusMsg.textContent = "⏸️ 一時停止中";
+    renderSingleFrame();
+  }
+});
+
+function startRenderLoop() {
+  if (animId) cancelAnimationFrame(animId);
+  function loop() {
+    if (!video.paused && !video.ended) {
+      renderSingleFrame();
+      animId = requestAnimationFrame(loop);
+    }
+  }
+  loop();
+}
+
+function renderSingleFrame(fillGreen = false) {
+  if (!isVideoLoaded || workCanvas.width === 0) return;
+
+  const w = workCanvas.width;
+  const h = workCanvas.height;
+  workCtx.clearRect(0, 0, w, h);
+  workCtx.drawImage(video, 0, 0, w, h);
+
+  if (isTransparentMode) {
+    const imgData = workCtx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    if (!bgColor) {
+      const corners = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + (w - 1)) * 4];
+      let r = 0, g = 0, b = 0;
+      for (const idx of corners) {
+        r += data[idx];
+        g += data[idx + 1];
+        b += data[idx + 2];
+      }
+      bgColor = { r: r / 4, g: g / 4, b: b / 4 };
+    }
+
+    const tol = parseInt(toleranceInput.value, 10) * 2.2;
+    const tolSq = tol * tol;
+    const stab = parseInt(stabilityInput.value, 10) / 100;
+    const erodePx = parseInt(erodeInput.value, 10);
+
+    const visited = new Uint8Array(w * h);
+    const isBg = new Uint8Array(w * h);
+    const queue = new Int32Array(w * h);
+    let head = 0, tail = 0;
+
+    function pushIfBg(x, y) {
+      const pos = y * w + x;
+      if (visited[pos]) return;
+      visited[pos] = 1;
+      const idx = pos * 4;
+      const dr = data[idx] - bgColor.r;
+      const dg = data[idx + 1] - bgColor.g;
+      const db = data[idx + 2] - bgColor.b;
+      if (dr * dr + dg * dg + db * db <= tolSq) {
+        isBg[pos] = 1;
+        queue[tail++] = pos;
+      }
+    }
+
+    for (let x = 0; x < w; x++) { pushIfBg(x, 0); pushIfBg(x, h - 1); }
+    for (let y = 0; y < h; y++) { pushIfBg(0, y); pushIfBg(w - 1, y); }
+
+    while (head < tail) {
+      const pos = queue[head++];
+      const x = pos % w;
+      const y = (pos - x) / w;
+      if (x > 0) pushIfBg(x - 1, y);
+      if (x < w - 1) pushIfBg(x + 1, y);
+      if (y > 0) pushIfBg(x, y - 1);
+      if (y < h - 1) pushIfBg(x, y + 1);
+    }
+
+    let currentBg = isBg;
+    for (let step = 0; step < erodePx; step++) {
+      const nextBg = new Uint8Array(currentBg);
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const p = y * w + x;
+          if (!currentBg[p]) {
+            if (currentBg[p - 1] || currentBg[p + 1] || currentBg[p - w] || currentBg[p + w]) {
+              nextBg[p] = 1;
+            }
+          }
+        }
+      }
+      currentBg = nextBg;
+    }
+
+    if (!prevMask || prevMask.length !== w * h) {
+      prevMask = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) prevMask[i] = currentBg[i] ? 0 : 255;
+    }
+
+    for (let i = 0; i < w * h; i++) {
+      const targetAlpha = currentBg[i] ? 0 : 255;
+      const blended = prevMask[i] * stab + targetAlpha * (1 - stab);
+      const finalAlpha = blended > 128 ? 255 : 0;
+      prevMask[i] = blended;
+      data[i * 4 + 3] = finalAlpha;
+    }
+
+    workCtx.putImageData(imgData, 0, 0);
+  }
+
+  const outW = canvas.width;
+  const outH = canvas.height;
+  ctx.clearRect(0, 0, outW, outH);
+
+  if (fillGreen) {
+    ctx.fillStyle = '#00FF00';
+    ctx.fillRect(0, 0, outW, outH);
+  }
+
+  const scale = Math.min(outW / w, outH / h);
+  const drawW = w * scale;
+  const drawH = h * scale;
+  const offsetX = (outW - drawW) / 2;
+  const offsetY = (outH - drawH) / 2;
+
+  if (isOutlineOn && isTransparentMode) {
+    const ow = parseInt(outlineWidthInput.value, 10);
+    const colorVal = document.querySelector('input[name="outlineColor"]:checked').value;
+    const strokeColor = colorVal === 'white' ? '#FFFFFF' : '#000000';
+
+    const silCanvas = document.createElement('canvas');
+    silCanvas.width = w;
+    silCanvas.height = h;
+    const silCtx = silCanvas.getContext('2d');
+    silCtx.drawImage(workCanvas, 0, 0);
+    silCtx.globalCompositeOperation = 'source-in';
+    silCtx.fillStyle = strokeColor;
+    silCtx.fillRect(0, 0, w, h);
+
+    const steps = 16;
+    for (let i = 0; i < steps; i++) {
+      const angle = (i / steps) * Math.PI * 2;
+      const dx = Math.cos(angle) * ow;
+      const dy = Math.sin(angle) * ow;
+      ctx.drawImage(silCanvas, offsetX + dx, offsetY + dy, drawW, drawH);
+    }
+  }
+
+  ctx.drawImage(workCanvas, offsetX, offsetY, drawW, drawH);
+}
+
+document.getElementById('savePngBtn').addEventListener('click', () => {
+  if (!isVideoLoaded) return alert("先に動画を選択してください");
+  renderSingleFrame(false);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `stamp_${canvas.width}x${canvas.height}.png`;
+  a.click();
+});
+
+async function exportGif(filenamePrefix) {
+  if (!isVideoLoaded) return alert("先に動画を選択してください");
+  statusMsg.textContent = "⏳ GIFを生成準備中...";
+
+  const workerResp = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+  const workerText = await workerResp.text();
+  const workerBlob = new Blob([workerText], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(workerBlob);
+
+  const gif = new GIF({
+    workers: 2,
+    quality: 10,
+    width: canvas.width,
+    height: canvas.height,
+    transparent: 0x00FF00,
+    workerScript: workerUrl
+  });
+
+  const durVal = durationSelect.value;
+  const maxSec = durVal === 'all' ? Math.min(video.duration || 3, 8) : Number(durVal);
+  const fps = 10;
+  const totalFrames = Math.floor(maxSec * fps);
+
+  video.pause();
+  prevMask = null;
+
+  const gifCanvas = document.createElement('canvas');
+  gifCanvas.width = canvas.width;
+  gifCanvas.height = canvas.height;
+  const gifCtx = gifCanvas.getContext('2d', { willReadFrequently: true });
+
+  for (let i = 0; i < totalFrames; i++) {
+    statusMsg.textContent = `⏳ GIFフレーム作成中... (${i + 1}/${totalFrames})`;
+    video.currentTime = (i / fps) % (video.duration || 1);
+    await new Promise(r => { video.onseeked = r; });
+
+    renderSingleFrame(false);
+    gifCtx.clearRect(0, 0, gifCanvas.width, gifCanvas.height);
+    gifCtx.drawImage(canvas, 0, 0);
+
+    const imgD = gifCtx.getImageData(0, 0, gifCanvas.width, gifCanvas.height);
+    const d = imgD.data;
+    for (let p = 0; p < d.length; p += 4) {
+      if (d[p + 3] < 128) {
+        d[p] = 0; d[p + 1] = 255; d[p + 2] = 0; d[p + 3] = 255;
+      } else if (d[p] === 0 && d[p + 1] === 255 && d[p + 2] === 0) {
+        d[p + 1] = 254;
+      }
+    }
+    gifCtx.putImageData(imgD, 0, 0);
+    gif.addFrame(gifCtx, { copy: true, delay: 1000 / fps });
+  }
+
+  gif.on('finished', (blob) => {
+    statusMsg.textContent = "✅ GIFの保存が完了しました！";
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${filenamePrefix}_${canvas.width}x${canvas.height}.gif`;
+    a.click();
+    video.play();
+    startRenderLoop();
+  });
+
+  statusMsg.textContent = "⏳ GIFをエンコード中...";
+  gif.render();
+}
+
+document.getElementById('saveTiktokGifBtn').addEventListener('click', () => exportGif('tiktok_stamp'));
+document.getElementById('saveLineGifBtn').addEventListener('click', () => exportGif('line_stamp'));
+
+document.getElementById('saveGreenMp4Btn').addEventListener('click', async () => {
+  if (!isVideoLoaded) return alert("先に動画を選択してください");
+  const durVal = durationSelect.value;
+  const maxSec = durVal === 'all' ? Math.min(video.duration || 3, 8) : Number(durVal);
+
+  const stream = canvas.captureStream(30);
+  const recorder = new MediaRecorder(stream);
+  const chunks = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/mp4' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `greenback_${canvas.width}x${canvas.height}.mp4`;
+    a.click();
+    statusMsg.textContent = "✅ グリーンバック動画を保存しました！";
+    startRenderLoop();
+  };
+
+  if (animId) cancelAnimationFrame(animId);
+  video.currentTime = 0;
+  await video.play();
+  recorder.start();
+  statusMsg.textContent = `🔴 グリーンバック録画中... (${maxSec}秒)`;
+
+  const startTime = performance.now();
+  function recLoop() {
+    if ((performance.now() - startTime) / 1000 < maxSec) {
+      renderSingleFrame(true);
+      requestAnimationFrame(recLoop);
+    } else {
+      recorder.stop();
+    }
+  }
+  recLoop();
+});
+</script>
+</body>
+</html>
